@@ -15,10 +15,22 @@ from sklearn.metrics import make_scorer;
 from sklearn.metrics import mean_squared_error;
 from sklearn.model_selection import GridSearchCV;
 from sklearn.model_selection import KFold;
+from sklearn.feature_selection import RFECV;
+from sklearn.linear_model import SGDRegressor;
+from sklearn.linear_model import Ridge;
+
 
 from preprocess import rawDataProcess;
-
+from stacker import stacker;
+import xgboost as xgb;
 import lightgbm as lgb;
+
+
+def getEncryptVal(val):
+    if val<0:
+        return 0;
+    else:
+        return math.log(val+1,5);
 
 
 t_vis=pd.read_csv("D:/general_file_unclassified/about_code/JDD/Loan_pre/data/t_vis.csv");
@@ -33,7 +45,7 @@ for col in t_vis.columns:
     if '11' in col:
         colTrainDrop.append(col);
 dataTrainX=t_vis.drop(colTrainDrop,axis=1);
-dataTrainY=t_vis['loan_amount_11'];
+dataTrainY=t_vis['loan_amount_11'].apply(getEncryptVal);
 
 colPreDrop=['uid'];
 for col in t_vis.columns:
@@ -73,6 +85,8 @@ colCatList=['sex','cate_id_0','cate_id_1','cate_id_2',
                   'pid_0','pid_1','pid_2',];
             
 colScList=dataTrainX.drop(colCatList,axis=1).columns.values.tolist();       
+#colCatList=[];
+#colScList=[];
             
 preprocessor=rawDataProcess(dataTrainX,dataPre,colCatList,colScList);
 
@@ -84,82 +98,119 @@ print(dataPre.head())
 '''
 调参
 '''
-
-def getEncryptVal(val):
-    if val<0:
-        return 0;
-    else:
-        return math.log(val+1,5);
-def rmseScoreCal(y, y_pred, **kwargs):
-    y=pd.Series(y);
-    y=y.apply(getEncryptVal);
-    y_pred=pd.Series(y_pred);
-    y_pred=y_pred.apply(getEncryptVal);
-    return math.sqrt(mean_squared_error(y, y_pred, **kwargs));
-
+#def rmseScoreCal(y, y_pred, **kwargs):
+#    y=pd.Series(y);
+#    y_pred=pd.Series(y_pred);
+#    return math.sqrt(mean_squared_error(y, y_pred, **kwargs));
 
 #gridsearch调参
-rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
-lgbReg=lgb.LGBMRegressor();
-paramGrid={  
-        'subsample':[0.8],
-        'colsample_bytree':[0.8],
-        'max_bin':[8,9,10],
-        'subsample_freq':[9,10,11],
-        'min_child_samples':[450,500,550],
-        'max_depth':[11],
-        'random_state':[666],
-        'n_estimators':[800],
-        'learning_rate':[0.5],
-        'objective':['regression'],
-        'verbose':[1]
-};
-lgbReg=GridSearchCV(lgbReg,paramGrid,cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer);
-lgbReg.fit(dataTrainX,dataTrainY);
-print(lgbReg.best_score_);
-print(lgbReg.best_params_);
-
+#rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
+#lgbReg=lgb.LGBMRegressor();
+#paramGrid={  
+#        'num_leaves':[31],
+#        'subsample':[1.0],
+#        'colsample_bytree':[1.0],
+#        'subsample_freq':[1],
+#        'min_child_samples':[20],
+#        'min_child_weight':[0.001],
+#        'max_depth':[-1],
+#        'random_state':[666],
+#        'n_estimators':[10],
+#        'learning_rate':[0.1],
+#        'subsample_for_bin':[200000],
+#        'min_split_gain':[0.0],
+#        'reg_alpha':[0],
+#        'reg_lambda':[0],
+#        'objective':['regression'],
+#        'verbose':[1]
+#};
+#lgbReg=GridSearchCV(lgbReg,paramGrid,cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer);
+#lgbReg.fit(dataTrainX,dataTrainY);
+#print(lgbReg.best_score_);
+#print(lgbReg.best_params_);
 #print(lgbReg.cv_results_)
 
 
 
+#gridsearch调参
+#rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
+#lgbReg=xgb.XGBRegressor();
+#paramGrid={  
+#        'subsample':[1.0],
+#        'colsample_bytree':[1.0],
+#        'max_depth':[3],
+#        'seed':[666],
+#        'learning_rate':[0.1],
+#        'n_estimators':[100]
+#};
+#lgbReg=GridSearchCV(lgbReg,paramGrid,cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer);
+#lgbReg.fit(dataTrainX,dataTrainY);
+#print(lgbReg.best_score_);
+#print(lgbReg.best_params_);
+#print(lgbReg.cv_results_)
+
+
+#def selfEvalMetric(y_true, y_pred):
+#    return ('rmse',rmseScoreCal(y_true, y_pred),False);
+
+
+#Reg=xgb.XGBRegressor(subsample=0.8,colsample_bytree=0.8,max_depth=3,learning_rate=0.1,seed=666);
+#kfold=KFold(n_splits=5,random_state=1);
+#rmseScoreCalList=[];
+#for kTrainIndex,kTestIndex in kfold.split(dataTrainX,dataTrainY):
+#        kTrain_x=dataTrainX.iloc[kTrainIndex];  
+#        kTrain_y=dataTrainY.iloc[kTrainIndex]; 
+#        
+#        kTest_x=dataTrainX.iloc[kTestIndex];  
+#        kTest_y=dataTrainY.iloc[kTestIndex]; 
+#        
+#        
+#        #Reg.fit(kTrain_x,kTrain_y,eval_set=(kTest_x,kTest_y),eval_metric=selfEvalMetric,verbose=True,early_stopping_rounds=10);
+#        Reg.fit(kTrain_x,kTrain_y);
+#        testPre=Reg.predict(kTest_x);
+#        rmseScore=rmseScoreCal(kTest_y,testPre);
+#        print('single rmse:',rmseScore);
+#        rmseScoreCalList.append(rmseScore);
+#        break;
+#        
+#print('mean rmse:',np.array(rmseScoreCalList).mean());
+     
 
 '''
-def selfEvalMetric(y_true, y_pred):
-    return ('rmse',rmseScoreCal(y_true, y_pred),False);
-
-
-Reg=lgb.LGBMRegressor(subsample=0.8,colsample_bytree=0.8,max_depth=10,random_state=666,boosting_type='gbdt',n_estimators=100,learning_rate=0.1,verbose=1);
-kfold=KFold(n_splits=5,random_state=1);
-rmseScoreCalList=[];
-for kTrainIndex,kTestIndex in kfold.split(dataTrainX,dataTrainY):
-        kTrain_x=dataTrainX.iloc[kTrainIndex];  
-        kTrain_y=dataTrainY.iloc[kTrainIndex]; 
-        
-        kTest_x=dataTrainX.iloc[kTestIndex];  
-        kTest_y=dataTrainY.iloc[kTestIndex]; 
-
-        Reg.fit(kTrain_x,kTrain_y,eval_set=(kTest_x,kTest_y),eval_metric=selfEvalMetric,verbose=False);
-        
-        testPre=Reg.predict(kTest_x);
-        rmseScore=rmseScoreCal(kTest_y,testPre);
-        print('single rmse:',rmseScore);
-        rmseScoreCalList.append(rmseScore);
-        
-        
-print('mean rmse:',np.array(rmseScoreCalList).mean());
-'''     
-
-
-
-#ans=lgbReg.predict(dataPre);
-#ans=pd.DataFrame({'uid':t_vis['uid'],'loan_amount':ans});
-#ans['loan_amount']=ans['loan_amount'].apply(getEncryptVal);
-#ans.to_csv('D:/general_file_unclassified/about_code/JDD/Loan_pre/data/submit.csv',columns=['uid','loan_amount'],index=False);
+删除部分特征以达到更好的效果
+'''
+#estimator = lgb.LGBMRegressor(subsample=0.8,colsample_bytree=0.8,max_bin=9,subsample_freq=10,min_child_samples=500,max_depth=11,random_state=666,boosting_type='gbdt',n_estimators=1200,learning_rate=0.1,verbose=1);
+#selector = RFECV(estimator, step=10, cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer,verbose=True);
+#selector = selector.fit(dataTrainX,dataTrainY);
+#print(len(selector.grid_scores_));
+#print(selector.grid_scores_);
+#temp=selector.grid_scores_;
+#print(selector.get_support(indices=True))
+#print(selector.n_features_)
 #
+#for num in selector.get_support(indices=True):
+#    print(num,',');
 
 
 
+modelList={
+        xgb.XGBRegressor(subsample=1.0,colsample_bytree=1.0,max_depth=3,seed=666,learning_rate=0.1,n_estimators=100)
+        };
+higherModel=Ridge(random_state=888,alpha=0);
+stackerModel=stacker(modelList,higherModel,obj='reg',kFold=KFold(n_splits=5,random_state=555),kFoldHigher=KFold(n_splits=5,random_state=444));
+
+stackerModel.fit(dataTrainX,dataTrainY);
+
+for model in stackerModel.modelHigherList:
+    print(model.coef_)
+
+ans=stackerModel.predict(dataPre);
+ans=pd.DataFrame({'uid':t_vis['uid'],'loan_amount':ans});
+ans.to_csv('D:/general_file_unclassified/about_code/JDD/Loan_pre/data/submit.csv',columns=['uid','loan_amount'],index=False);
+print('end');
+
+
+dataTrainY.head()
 
 
 

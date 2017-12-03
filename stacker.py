@@ -9,6 +9,7 @@ import pandas as pd;
 import numpy  as np;
 import copy as cp;
 import math;
+from sklearn.metrics import mean_squared_error;
 from sklearn.metrics import roc_auc_score;
 from sklearn.model_selection import StratifiedKFold; 
 from sklearn.linear_model import LogisticRegression;
@@ -16,7 +17,7 @@ from sklearn.model_selection import cross_val_score;
 
 
 class stacker:
-    def __init__(self,modelList,higherModel=-1,kFold=StratifiedKFold(n_splits=5,random_state=0),kFoldHigher=StratifiedKFold(n_splits=5,random_state=777)):
+    def __init__(self,modelList,higherModel=-1,obj='binary',kFold=StratifiedKFold(n_splits=5,random_state=0),kFoldHigher=StratifiedKFold(n_splits=5,random_state=777)):
         
         #assert type(modelList)==list,"输入必须为一个模型的列表"
         #assert type(kFold)==StratifiedKFold,"输入必须为StratifiedKFold"
@@ -25,6 +26,8 @@ class stacker:
         self.kFoldHigher=kFoldHigher;
         self.modelList=modelList;
         self.higherModel=higherModel;
+        self.obj=obj;
+        
         
     def fit(self,X,Y,upsample=False):
         
@@ -38,7 +41,7 @@ class stacker:
         i=0;
         for model in self.modelList:
             modelList=[];
-            giniScoreList=[];
+            ScoreList=[];
             for kTrainIndex,kTestIndex in self.kFold.split(X,Y):
                 kTrain_x=X.iloc[kTrainIndex];  
                 kTrain_y=Y.iloc[kTrainIndex]; 
@@ -56,14 +59,21 @@ class stacker:
                 modelCp.fit(kTrain_x,kTrain_y);
                 modelList.append(modelCp);
                 
-                testPre=modelCp.predict_proba(kTest_x)[:,1];
+                if self.obj=='binary':
+                    testPre=modelCp.predict_proba(kTest_x)[:,1];
+                    giniScore=2*roc_auc_score(kTest_y,testPre)-1;
+                    ScoreList.append(giniScore);
+                    print('baseModel gini: ',giniScore);
+                elif self.obj=='reg':
+                    testPre=modelCp.predict(kTest_x);
+                    rmseScore=math.sqrt(mean_squared_error(kTest_y, testPre))
+                    ScoreList.append(rmseScore);
+                    print('rmse gini: ',rmseScore);
                 higherTrain.values[kTestIndex,i]=testPre;
-                giniScore=2*roc_auc_score(kTest_y,testPre)-1;
-                giniScoreList.append(giniScore);
-                print('baseModel gini: ',giniScore);
-            
-            self.modelScoreList.append((np.array(giniScoreList).mean(),np.array(giniScoreList).std()));
-            print('mean gini: ',np.array(giniScoreList).mean());
+                
+                
+            self.modelScoreList.append((np.array(ScoreList).mean(),np.array(ScoreList).std()));
+            print('mean gini: ',np.array(ScoreList).mean());
             print('-'*20);
             i+=1;   
             self.modelListList.append(modelList);
@@ -81,13 +91,18 @@ class stacker:
             kTest_x=higherTrain.iloc[kTestIndex];  
             kTest_y=Y.iloc[kTestIndex]; 
             higherModelcp.fit(kTrain_x,kTrain_y);
-            testPre=higherModelcp.predict_proba(kTest_x)[:,1];
-            giniScore=2*roc_auc_score(kTest_y,testPre)-1;
             
-            self.re_score.append(giniScore);
+            
+            if self.obj=='binary':
+                testPre=higherModelcp.predict_proba(kTest_x)[:,1];
+                score=2*roc_auc_score(kTest_y,testPre)-1;
+            elif self.obj=='reg':
+                testPre=higherModelcp.predict(kTest_x);
+                score=math.sqrt(mean_squared_error(kTest_y, testPre))
+            self.re_score.append(score);
             self.modelHigherList.append(higherModelcp);
             
-        print('stacker gini',np.array(self.re_score).mean());
+        print('stacker score',np.array(self.re_score).mean());
         
     def upsample(self,X,Y):
 #        print('X shape: ',X.shape);
@@ -120,7 +135,24 @@ class stacker:
         
         return data_copy;         
             
+    def predict(self,X):
+        #assert type(X)==pd.DataFrame,"X输入必须为DataFrame"
+        ans=0;
+        higherX=pd.DataFrame();
+        for i in range(0,len(self.modelListList)): 
+            for cf in self.modelListList[i]:
                 
+                if i not in higherX.columns:
+                    higherX[i]=cf.predict(X)/len(self.modelListList[i]);
+                else:
+                    higherX[i]+=cf.predict(X)/len(self.modelListList[i]);            
+        ans=0;        
+        for higherModel in self.modelHigherList:
+            if type(ans)==type(0):
+                ans=higherModel.predict(higherX)/len(self.modelHigherList);   
+            else:
+                ans+=higherModel.predict(higherX)/len(self.modelHigherList);
+        return ans;            
         
             
     def predict_proba(self,X):
