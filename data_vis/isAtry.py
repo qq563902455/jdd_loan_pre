@@ -41,8 +41,6 @@ t_click.index=pd.to_datetime(t_click.index,format='%Y-%m-%d',errors='raise');
 t_user.index=pd.to_datetime(t_user.index,format='%Y-%m-%d',errors='raise');
 
 
-
-
 print(t_user.describe());
 print('由上可知t_user中没有空值');
 print('-'*30);
@@ -111,17 +109,36 @@ temp=tempGroupby.apply(lambda x:pd.Series(x['pid']).mode().values);
 t_user_click['pid']=temp.values;
 temp=tempGroupby.apply(lambda x:pd.Series(x['param']).mode().values);
 t_user_click['param']=temp.values;
+
+tempGroupby=t_click.groupby(by=['uid','month','pid'],as_index=False);
+temp=tempGroupby['param'].count();
+temp=temp.rename(columns={'param':'pid_num'});
+for i in range(temp['pid'].min(),temp['pid'].max()+1):
+    t_user_click=pd.merge(t_user_click,temp[temp['pid']==i][['uid','month','pid_num']],how='left',on=['uid','month']);
+    t_user_click=t_user_click.rename(columns={'pid_num':'pid'+str(i)+'_num'});
+    t_user_click['pid'+str(i)+'_ratio']=t_user_click['pid'+str(i)+'_num']/t_user_click['click_num'];
+t_user_click=t_user_click.fillna(0);
+
 print('捏一个t_click_user');
 print(t_user_click.head());
 print('-'*30);
+
 
 print('t_loan和t_loan_sum中没有空值');
 print(t_loan.count())
 print(t_loan_sum.count())
 t_loan['month']=t_loan['loan_time'].apply(lambda x:x[5:7]).astype(int);
-t_user_loan=t_loan.groupby(by=['uid','month'],as_index=False).mean();
-t_user_loan['loan_num']=t_loan.groupby(by=['uid','month'],as_index=False)['loan_time'].count()['loan_time'];
-t_user_loan.head()
+tempGroupby=t_loan.groupby(by=['uid','month'],as_index=False);
+t_user_loan=tempGroupby['loan_amount'].sum();
+t_user_loan['plannum_amount']=tempGroupby['plannum'].sum()['plannum'];
+t_user_loan['loan_average']=tempGroupby['loan_amount'].mean()['loan_amount'];
+t_user_loan['plannum_average']=tempGroupby['plannum'].mean()['plannum'];
+t_user_loan['burden_per_m']=t_user_loan['loan_amount']/t_user_loan['plannum_amount'];
+t_user_loan['loan_num']=tempGroupby['loan_time'].count()['loan_time'];
+t_user_loan['loan_max']=tempGroupby['loan_amount'].max()['loan_amount'];
+t_user_loan['loan_min']=tempGroupby['loan_amount'].min()['loan_amount'];
+t_user_loan.head(20)
+
 
 print('-'*30);
 print('t_order的情况如下:');
@@ -139,7 +156,7 @@ t_order.loc[t_order['price_x'].isnull(),['price_x']]=t_order[t_order['price_x'].
 t_order=t_order.drop(['price_y'],axis=1);
 t_order=t_order.rename(columns={'price_x':'price'});
 print('填充完成，填充后的count结果如下:');
-print(t_order.count())
+print(t_order.head())
 print('-'*30);
 
 
@@ -150,6 +167,8 @@ t_order_user=tempGroupby['uid','month','price','qty'].sum();
 t_order_user['discount']=tempGroupby['discount'].mean()['discount'];
 t_order_user['cate_id']=tempGroupby.apply(lambda x:pd.Series(x['cate_id']).mode().values).values;
 t_order_user['buy_num']=tempGroupby.count()['price'];
+t_order_user['max_price']=tempGroupby['price'].max()['price'];
+t_order_user['min_price']=tempGroupby['price'].min()['price'];
 t_order_user['average_price']=t_order_user['price']/t_order_user['buy_num'];
 print('捏完后的效果如下:')
 print(t_order_user.head())
@@ -176,9 +195,7 @@ print('-'*30);
 print('开始合并数据集，开始做一些统计分析:')
 print('根据观察t_loan_sum里的数据,就是t_user_loan里面11月的数据');
 
-
 print('合并t_user与t_user_loan');
-
 tempList=[];
 for i in range(8,12):
     temp=t_user.copy();
@@ -188,7 +205,7 @@ for i in range(8,12):
 t_merge=pd.concat(tempList);
 
 t_merge=pd.merge(left=t_merge,right=t_user_loan,on=['uid','month'],how='left');
-t_merge['plannum']=t_merge['plannum'].fillna(1);
+t_merge[['plannum_amount','plannum_average']]=t_merge[['plannum_amount','plannum_average']].fillna(1);
 t_merge=t_merge.fillna(0);
 t_merge=pd.merge(left=t_merge,right=t_order_user,on=['uid','month'],how='left');
 t_merge=t_merge.fillna(0);
@@ -281,6 +298,11 @@ t_vis.to_csv("D:/general_file_unclassified/about_code/JDD/Loan_pre/data/t_vis.cs
 print('end');
 
 
+
+
+#sns.barplot(x="param_9", y="loan_amount_10",data=t_vis);
+#sns.barplot(x="pid_10", y="loan_amount_11",data=t_vis);
+#sns.barplot(x="pid_11", y="loan_amount_11",data=t_vis);
 
 
 
