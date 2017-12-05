@@ -38,10 +38,6 @@ t_vis=t_vis.drop(['Unnamed: 0'],axis=1);
 t_loan_sum=pd.read_csv("D:/general_file_unclassified/about_code/JDD/Loan_pre/data/t_loan_sum.csv");
 
 
-#for col in t_vis.columns:
-#    if 'ratio' in col:
-#        t_vis=t_vis.drop([col],axis=1);
-
 
 '''
 拆分训练集，以及测试集
@@ -91,7 +87,7 @@ onehot&尺度调整
 '''
 
 colCatList=['sex','cate_id_0','cate_id_1','cate_id_2',
-                  'param_0','param_1','param_2',
+#                  'param_0','param_1','param_2',
                   'pid_0','pid_1','pid_2',];
             
 colScList=dataTrainX.drop(colCatList,axis=1).columns.values.tolist();       
@@ -124,14 +120,14 @@ rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
 lgbReg=lgb.LGBMRegressor();
 paramGrid={  
         'num_leaves':[31],
-        'subsample':[1.0,0.9],
+        'subsample':[0.9],
         'colsample_bytree':[0.8],
         'subsample_freq':[1,2],
         'min_child_samples':[600],
         'min_child_weight':[0.001],
-        'max_depth':[4,5,6],
+        'max_depth':[6],
         'random_state':[666],
-        'n_estimators':[500,600,700],
+        'n_estimators':[500],
         'learning_rate':[0.02],
         'subsample_for_bin':[220000],
         'min_split_gain':[0.0],
