@@ -35,16 +35,13 @@ def getEncryptVal(val):
 
 t_vis=pd.read_csv("D:/general_file_unclassified/about_code/JDD/Loan_pre/data/t_vis.csv");
 t_vis=t_vis.drop(['Unnamed: 0'],axis=1);
+t_loan_sum=pd.read_csv("D:/general_file_unclassified/about_code/JDD/Loan_pre/data/t_loan_sum.csv");
+
 
 #for col in t_vis.columns:
-#    if 'pid' in col:
+#    if 'ratio' in col:
 #        t_vis=t_vis.drop([col],axis=1);
-#t_vis['pid_10']
-#sns.barplot(x="pid_8", y="loan_amount_11",data=t_vis);
 
-#sns.barplot(x="cate_id_9", y="loan_amount_11",data=t_vis);
-#sns.barplot(x="pid_10", y="loan_amount_11",data=t_vis);
-#sns.barplot(x="pid_11", y="loan_amount_11",data=t_vis);
 
 '''
 拆分训练集，以及测试集
@@ -115,21 +112,27 @@ def rmseScoreCal(y, y_pred, **kwargs):
     y=pd.Series(y);
     y_pred=pd.Series(y_pred);
     return math.sqrt(mean_squared_error(y, y_pred, **kwargs));
+
+
+
+
+
+
 #
 ##gridsearch调参
 rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
 lgbReg=lgb.LGBMRegressor();
 paramGrid={  
         'num_leaves':[31],
-        'subsample':[1.0],
+        'subsample':[1.0,0.9],
         'colsample_bytree':[0.8],
         'subsample_freq':[1,2],
         'min_child_samples':[600],
         'min_child_weight':[0.001],
-        'max_depth':[5],
+        'max_depth':[4,5,6],
         'random_state':[666],
-        'n_estimators':[100],
-        'learning_rate':[0.1],
+        'n_estimators':[500,600,700],
+        'learning_rate':[0.02],
         'subsample_for_bin':[220000],
         'min_split_gain':[0.0],
         'reg_alpha':[0],
@@ -148,7 +151,7 @@ temp=lgbReg.cv_results_;
 
 
 #gridsearch调参
-#rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
+rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
 #lgbReg=xgb.XGBRegressor();
 #paramGrid={  
 #        'subsample':[0.8],
@@ -196,23 +199,20 @@ temp=lgbReg.cv_results_;
 '''
 删除部分特征以达到更好的效果
 '''
-estimator = lgb.LGBMRegressor(subsample=1.0,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=600,max_depth=5,random_state=666,n_estimators=450,learning_rate=0.02,verbose=1);
-selector = RFECV(estimator, step=20, cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer,verbose=True);
-selector = selector.fit(dataTrainX,dataTrainY);
-print(len(selector.grid_scores_));
-print(selector.grid_scores_);
-temp=selector.grid_scores_;
-print(selector.get_support(indices=True))
-print(selector.n_features_)
+#estimator = lgb.LGBMRegressor(subsample=1.0,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=600,max_depth=5,random_state=666,n_estimators=450,learning_rate=0.02,verbose=1);
+#selector = RFECV(estimator, step=20, cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer,verbose=True);
+#selector = selector.fit(dataTrainX,dataTrainY);
+#print(len(selector.grid_scores_));
+#print(selector.grid_scores_);
+#print(selector.get_support(indices=True))
+#print(selector.n_features_)
+#dataTrainX=dataTrainX.iloc[:,selector.get_support(indices=True)]
 #
-#for num in selector.get_support(indices=True):
-#    print(num,',');
-
-
-
+#
+#
 #modelList={
-#        xgb.XGBRegressor(subsample=0.8,colsample_bytree=0.9,colsample_bylevel=0.9,max_depth=5,seed=666,learning_rate=0.02,n_estimators=300),
-#        lgb.LGBMRegressor(subsample=1.0,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=600,max_depth=5,random_state=666,n_estimators=450,learning_rate=0.02,verbose=1)
+#        lgb.LGBMRegressor(subsample=1.0,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=600,max_depth=5,random_state=666,n_estimators=450,learning_rate=0.02,verbose=1),
+#        xgb.XGBRegressor(subsample=0.8,colsample_bytree=0.9,colsample_bylevel=0.9,max_depth=5,seed=666,learning_rate=0.02,n_estimators=300),        
 #        };
 #higherModel=Ridge(random_state=888,alpha=0);
 #stackerModel=stacker(modelList,higherModel,obj='reg',kFold=KFold(n_splits=5,random_state=555),kFoldHigher=KFold(n_splits=5,random_state=444));
@@ -222,7 +222,7 @@ print(selector.n_features_)
 #for model in stackerModel.modelHigherList:
 #    print(model.coef_)
 ##
-#ans=stackerModel.predict(dataPre);
+#ans=stackerModel.predict(dataPre[dataTrainX.columns]);
 #
 #
 #ans=pd.DataFrame({'uid':t_vis['uid'],'loan_amount':ans});
