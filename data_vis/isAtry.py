@@ -28,7 +28,7 @@ t_user['limit']=t_user['limit'].apply(getRealValAboutMoney);
 t_loan_sum['loan_sum']=t_loan_sum['loan_sum'].apply(getRealValAboutMoney);
 t_loan['loan_amount']=t_loan['loan_amount'].apply(getRealValAboutMoney);
 t_order['price']=t_order['price'].apply(getRealValAboutMoney);
-
+t_order['discount']=t_order['discount'].apply(getRealValAboutMoney);
 
 print(t_click.head());
 print(t_user.head());
@@ -162,14 +162,25 @@ print('-'*30);
 
 print('捏一个t_order_user');
 t_order['month']=t_order['buy_time'].apply(lambda x:x[5:7]).astype(int);
+
+t_order['price_sum']=t_order['price']*t_order['qty'];
+t_order['actual_pay']=t_order['price_sum']-t_order['discount'];
+
 tempGroupby=t_order.groupby(by=['uid','month'],as_index=False);
-t_order_user=tempGroupby['uid','month','price','qty'].sum();
-t_order_user['discount']=tempGroupby['discount'].mean()['discount'];
+t_order_user=tempGroupby['uid','month','price_sum','actual_pay','discount','qty'].sum();
+
+t_order_user['discount_mean']=tempGroupby['discount'].mean()['discount'];
+t_order_user['price_sum_mean']=tempGroupby['price_sum'].mean()['price_sum'];
+t_order_user['actual_pay_mean']=tempGroupby['actual_pay'].mean()['actual_pay'];
+
 t_order_user['cate_id']=tempGroupby.apply(lambda x:pd.Series(x['cate_id']).mode().values).values;
 t_order_user['buy_num']=tempGroupby.count()['price'];
 t_order_user['max_price']=tempGroupby['price'].max()['price'];
 t_order_user['min_price']=tempGroupby['price'].min()['price'];
-t_order_user['average_price']=t_order_user['price']/t_order_user['buy_num'];
+t_order_user['average_price']=t_order_user['price_sum']/t_order_user['qty'];
+t_order_user['average_pay']=t_order_user['actual_pay']/t_order_user['qty'];
+t_order_user['average_discount']=t_order_user['discount']/t_order_user['qty'];
+
 print('捏完后的效果如下:')
 print(t_order_user.head())
 print('-'*30);

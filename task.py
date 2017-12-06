@@ -19,7 +19,6 @@ from sklearn.feature_selection import RFECV;
 from sklearn.linear_model import SGDRegressor;
 from sklearn.linear_model import Ridge;
 
-
 from preprocess import rawDataProcess;
 from stacker import stacker;
 import xgboost as xgb;
@@ -35,9 +34,6 @@ def getEncryptVal(val):
 
 t_vis=pd.read_csv("D:/general_file_unclassified/about_code/JDD/Loan_pre/data/t_vis.csv");
 t_vis=t_vis.drop(['Unnamed: 0'],axis=1);
-t_loan_sum=pd.read_csv("D:/general_file_unclassified/about_code/JDD/Loan_pre/data/t_loan_sum.csv");
-
-
 
 '''
 拆分训练集，以及测试集
@@ -87,7 +83,7 @@ onehot&尺度调整
 '''
 
 colCatList=['sex','cate_id_0','cate_id_1','cate_id_2',
-#                  'param_0','param_1','param_2',
+                  'param_0','param_1','param_2',
                   'pid_0','pid_1','pid_2',];
             
 colScList=dataTrainX.drop(colCatList,axis=1).columns.values.tolist();       
@@ -105,7 +101,7 @@ print(dataPre.head())
 调参
 '''
 def rmseScoreCal(y, y_pred, **kwargs):
-    y=pd.Series(y);
+    y=pd.Series(y);    
     y_pred=pd.Series(y_pred);
     return math.sqrt(mean_squared_error(y, y_pred, **kwargs));
 
@@ -122,12 +118,12 @@ paramGrid={
         'num_leaves':[31],
         'subsample':[0.9],
         'colsample_bytree':[0.8],
-        'subsample_freq':[1,2],
-        'min_child_samples':[600],
+        'subsample_freq':[2],
+        'min_child_samples':[400],
         'min_child_weight':[0.001],
-        'max_depth':[6],
+        'max_depth':[7],
         'random_state':[666],
-        'n_estimators':[500],
+        'n_estimators':[400],
         'learning_rate':[0.02],
         'subsample_for_bin':[220000],
         'min_split_gain':[0.0],
@@ -137,7 +133,9 @@ paramGrid={
         'objective':['regression'],
         'verbose':[1]
 };
-#paramGrid={};
+#lgbReg=SGDRegressor();
+#paramGrid={'random_state':[888],
+#           };
 lgbReg=GridSearchCV(lgbReg,paramGrid,cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer);
 lgbReg.fit(dataTrainX,dataTrainY);
 print(lgbReg.best_score_);
@@ -168,9 +166,9 @@ rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
 
 #def selfEvalMetric(y_true, y_pred):
 #    return ('rmse',rmseScoreCal(y_true, y_pred),False);
-
-
-#Reg=lgb.LGBMRegressor(subsample=1.0,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=600,max_depth=5,random_state=666,n_estimators=2000,learning_rate=0.02,verbose=1);
+#
+#
+#Reg=lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=500,subsample_freq=2,max_depth=7,random_state=666,n_estimators=2000,learning_rate=0.02,verbose=1);
 #kfold=KFold(n_splits=5,random_state=1);
 #rmseScoreCalList=[];
 #for kTrainIndex,kTestIndex in kfold.split(dataTrainX,dataTrainY):
@@ -181,21 +179,20 @@ rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
 #        kTest_y=dataTrainY.iloc[kTestIndex]; 
 #        
 #        
-#        Reg.fit(kTrain_x,kTrain_y,eval_set=(kTest_x,kTest_y),eval_metric=selfEvalMetric,verbose=True,early_stopping_rounds=100);
+#        Reg.fit(kTrain_x,kTrain_y,eval_set=(kTest_x,kTest_y),eval_metric=selfEvalMetric,verbose=True,early_stopping_rounds=50);
 #        #Reg.fit(kTrain_x,kTrain_y);
 #        testPre=Reg.predict(kTest_x);
 #        
 #        rmseScore=rmseScoreCal(kTest_y,testPre);
 #        print('single rmse:',rmseScore);
 #        rmseScoreCalList.append(rmseScore);
-#        break;
 #        
 #print('mean rmse:',np.array(rmseScoreCalList).mean());
      
 '''
 删除部分特征以达到更好的效果
 '''
-#estimator = lgb.LGBMRegressor(subsample=1.0,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=600,max_depth=5,random_state=666,n_estimators=450,learning_rate=0.02,verbose=1);
+#estimator = lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=400,subsample_freq=2,max_depth=7,random_state=666,n_estimators=370,learning_rate=0.02,verbose=1);
 #selector = RFECV(estimator, step=20, cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer,verbose=True);
 #selector = selector.fit(dataTrainX,dataTrainY);
 #print(len(selector.grid_scores_));
@@ -207,7 +204,7 @@ rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
 #
 #
 #modelList={
-#        lgb.LGBMRegressor(subsample=1.0,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=600,max_depth=5,random_state=666,n_estimators=450,learning_rate=0.02,verbose=1),
+#        lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=400,subsample_freq=2,max_depth=7,random_state=666,n_estimators=370,learning_rate=0.02,verbose=1),
 #        xgb.XGBRegressor(subsample=0.8,colsample_bytree=0.9,colsample_bylevel=0.9,max_depth=5,seed=666,learning_rate=0.02,n_estimators=300),        
 #        };
 #higherModel=Ridge(random_state=888,alpha=0);
@@ -222,10 +219,8 @@ rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
 #
 #
 #ans=pd.DataFrame({'uid':t_vis['uid'],'loan_amount':ans});
+#ans.loc[ans['loan_amount']<0,['loan_amount']]=0;
 #ans.to_csv('D:/general_file_unclassified/about_code/JDD/Loan_pre/data/submit.csv',columns=['uid','loan_amount'],index=False);
 #print('end');
-
-
-
 
 
