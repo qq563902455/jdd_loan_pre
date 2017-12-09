@@ -128,6 +128,8 @@ print('t_loan和t_loan_sum中没有空值');
 print(t_loan.count())
 print(t_loan_sum.count())
 t_loan['month']=t_loan['loan_time'].apply(lambda x:x[5:7]).astype(int);
+t_loan['hour']=t_loan['loan_time'].apply(lambda x:str(x)[11:13]).astype(int);
+
 tempGroupby=t_loan.groupby(by=['uid','month'],as_index=False);
 t_user_loan=tempGroupby['loan_amount'].sum();
 t_user_loan['plannum_amount']=tempGroupby['plannum'].sum()['plannum'];
@@ -137,10 +139,44 @@ t_user_loan['burden_per_m']=t_user_loan['loan_amount']/t_user_loan['plannum_amou
 t_user_loan['loan_num']=tempGroupby['loan_time'].count()['loan_time'];
 t_user_loan['loan_max']=tempGroupby['loan_amount'].max()['loan_amount'];
 t_user_loan['loan_min']=tempGroupby['loan_amount'].min()['loan_amount'];
-t_user_loan.head(20)
 
+tempGroupby=t_loan.groupby(by=['uid','month','hour'],as_index=False);
+temp=tempGroupby['loan_amount','plannum'].sum();
+temp['loan_num']=tempGroupby['loan_amount'].count()['loan_amount'];
 
+for i in range(0,24):
+    rawNameList=temp.columns;
+    temp=temp.rename(columns={'loan_amount':'loan_amount_'+'hour'+str(i),'plannum':'plannum_'+'hour'+str(i),'loan_num':'loan_num_'+'hour'+str(i)});    
+    t_user_loan=pd.merge(t_user_loan,temp[temp['hour']==i].drop(['hour'],axis=1),how='left',on=['uid','month']);
+    temp.columns=rawNameList;
+t_user_loan=t_user_loan.fillna(0);
+
+for i in range(0,24):
+    t_user_loan['loan_amount_'+'hour'+str(i)+'_ratio']=t_user_loan['loan_amount_'+'hour'+str(i)]/t_user_loan['loan_amount'];
+t_user_loan['mostly_loan_hour']=0;
+
+hourList=[];
+for i in range(0,24):
+    hourList.append('loan_amount_'+'hour'+str(i)+'_ratio');
+t_user_loan['loan_amount_hour_max_ratio']=t_user_loan[hourList].max(axis=1);
+
+for i in range(0,24):
+     t_user_loan.loc[t_user_loan['loan_amount_'+'hour'+str(i)+'_ratio']==t_user_loan['loan_amount_hour_max_ratio'],'mostly_loan_hour']=i;
+nightList=[];
+for i in [23,0,1,2,3,4,5,6]:
+    nightList.append('loan_amount_'+'hour'+str(i)+'_ratio');
+dayList=[];
+for i in range(0,24):
+    if i not in [23,0,1,2,3,4,5,6]:
+        dayList.append('loan_amount_'+'hour'+str(i)+'_ratio');
+t_user_loan['loan_amount_day_ratio']=t_user_loan[dayList].sum(axis=1);
+t_user_loan['loan_amount_night_ratio']=t_user_loan[nightList].sum(axis=1);
+
+t_user_loan['mostly_loan_day_or_night']=1;
+t_user_loan.loc[t_user_loan['loan_amount_day_ratio']<0.5,'mostly_loan_day_or_night']=0;
+print('t_user_loan完成');
 print('-'*30);
+
 print('t_order的情况如下:');
 print(t_order.head(5));
 print('t_order中price中存在空值');
@@ -204,9 +240,23 @@ print('-'*30);
 
 
 print('开始合并数据集，开始做一些统计分析:')
-print('根据观察t_loan_sum里的数据,就是t_user_loan里面11月的数据');
 
-print('合并t_user与t_user_loan');
+
+for col in t_user.columns:
+    if col not in ['uid','month','age','sex','limit']:        
+        t_user=t_user.rename(columns={col:'t_user_'+col});
+for col in t_user_loan.columns:
+    if col not in ['uid','month','age','sex','limit']: 
+        t_user_loan=t_user_loan.rename(columns={col:'t_loan_'+col});
+for col in t_order_user.columns:
+    if col not in ['uid','month','age','sex','limit']: 
+        t_order_user=t_order_user.rename(columns={col:'t_order_'+col});   
+for col in t_user_click.columns:
+    if col not in ['uid','month','age','sex','limit']: 
+        t_user_click=t_user_click.rename(columns={col:'t_click_'+col});   
+
+
+
 tempList=[];
 for i in range(8,12):
     temp=t_user.copy();
@@ -215,8 +265,12 @@ for i in range(8,12):
     
 t_merge=pd.concat(tempList);
 
+
+ 
+
+
 t_merge=pd.merge(left=t_merge,right=t_user_loan,on=['uid','month'],how='left');
-t_merge[['plannum_amount','plannum_average']]=t_merge[['plannum_amount','plannum_average']].fillna(1);
+#t_merge[['plannum_amount','plannum_average']]=t_merge[['plannum_amount','plannum_average']].fillna(1);
 t_merge=t_merge.fillna(0);
 t_merge=pd.merge(left=t_merge,right=t_order_user,on=['uid','month'],how='left');
 t_merge=t_merge.fillna(0);

@@ -67,22 +67,47 @@ for col in dataTrainX.columns:
 dataTrainX.columns=colNameList;
 dataPre.columns=colNameList;
 
-colCatList=['sex','cate_id_0','cate_id_1','cate_id_2',
-                  'param_0','param_1','param_2',
-                  'pid_0','pid_1','pid_2',];
+colCatList=['sex',
+#                  'cate_id_0','cate_id_1','cate_id_2',
+#                  'param_0','param_1','param_2',
+                  'pid_0','pid_1','pid_2',
+                  'mostly_loan_day_or_night_0','mostly_loan_day_or_night_1','mostly_loan_day_or_night_2',
+                  'mostly_loan_hour_0','mostly_loan_hour_1','mostly_loan_hour_2'];
             
 for col in dataTrainX.drop(colCatList,axis=1).columns:
     if '_0' in col:
         dataTrainX[col[0:len(col)-2]+'_sum012']=dataTrainX[col[0:len(col)-2]+'_0']+dataTrainX[col[0:len(col)-2]+'_1']+dataTrainX[col[0:len(col)-2]+'_2'];
         dataPre[col[0:len(col)-2]+'_sum012']=dataPre[col[0:len(col)-2]+'_0']+dataPre[col[0:len(col)-2]+'_1']+dataPre[col[0:len(col)-2]+'_2'];
-            
+ 
+
+dataTrainX['is_there_zero_loan']=0;
+dataTrainX['is_there_three_loan']=1;
+
+dataTrainX.loc[dataTrainX['loan_amount_sum012']==0,'is_there_zero_loan']=1;
+dataTrainX.loc[dataTrainX['loan_amount_0']==0,'is_there_three_loan']=0;
+dataTrainX.loc[dataTrainX['loan_amount_1']==0,'is_there_three_loan']=0;
+dataTrainX.loc[dataTrainX['loan_amount_2']==0,'is_there_three_loan']=0;
+
+dataPre['is_there_zero_loan']=0;
+dataPre['is_there_three_loan']=1;
+
+dataPre.loc[dataPre['loan_amount_sum012']==0,'is_there_zero_loan']=1;
+dataPre.loc[dataPre['loan_amount_0']==0,'is_there_three_loan']=0;
+dataPre.loc[dataPre['loan_amount_1']==0,'is_there_three_loan']=0;
+dataPre.loc[dataPre['loan_amount_2']==0,'is_there_three_loan']=0;
+
+dataTrainX[dataTrainX['is_there_zero_loan']==1].shape[0]
+
+#temp=dataTrainX.corr();
+
+           
 colScList=dataTrainX.drop(colCatList,axis=1).columns.values.tolist();       
             
-preprocessor=rawDataProcess(dataTrainX,dataPre,colCatList,colScList);
-
-dataTrainX=preprocessor.toTrainData();
-dataPre=preprocessor.toTestData();
-print(dataPre.head())
+#preprocessor=rawDataProcess(dataTrainX,dataPre,colCatList,colScList);
+#
+#dataTrainX=preprocessor.toTrainData();
+#dataPre=preprocessor.toTestData();
+#print(dataPre.head())
 
 
 '''
@@ -156,7 +181,7 @@ def selfEvalMetric(y_true, y_pred):
     return ('rmse',rmseScoreCal(y_true, y_pred),False);
 
 
-Reg=lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=400,subsample_freq=2,max_depth=8,random_state=666,n_estimators=350,learning_rate=0.02,verbose=1);
+Reg=lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=400,subsample_freq=2,max_depth=8,random_state=666,n_estimators=1000,learning_rate=0.02,verbose=1);
 kfold=KFold(n_splits=5,random_state=1);
 rmseScoreCalList=[];
 for kTrainIndex,kTestIndex in kfold.split(dataTrainX,dataTrainY):
@@ -167,8 +192,8 @@ for kTrainIndex,kTestIndex in kfold.split(dataTrainX,dataTrainY):
         kTest_y=dataTrainY.iloc[kTestIndex]; 
         
         
-#        Reg.fit(kTrain_x,kTrain_y,eval_set=(kTest_x,kTest_y),eval_metric=selfEvalMetric,verbose=True,early_stopping_rounds=50);
-        Reg.fit(kTrain_x,kTrain_y);
+        Reg.fit(kTrain_x,kTrain_y,eval_set=(kTest_x,kTest_y),eval_metric=selfEvalMetric,verbose=True,early_stopping_rounds=50);
+#        Reg.fit(kTrain_x,kTrain_y);
         testPre=Reg.predict(kTest_x);
         
         rmseScore=rmseScoreCal(kTest_y,testPre);
@@ -180,42 +205,42 @@ print('mean rmse:',np.array(rmseScoreCalList).mean());
 '''
 删除部分特征以达到更好的效果
 '''
-estimator = lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=400,subsample_freq=2,max_depth=8,random_state=666,n_estimators=350,learning_rate=0.02,verbose=1);
-selector = RFECV(estimator, step=20, cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer,verbose=True);
-selector = selector.fit(dataTrainX,dataTrainY);
-print(len(selector.grid_scores_));
-print(selector.grid_scores_);
-print(selector.get_support(indices=True))
-print(selector.n_features_)
-
-
-temp=selector.grid_scores_;
-for i in temp:
-    print(i);
-
-
-
-dataTrainX=dataTrainX.iloc[:,selector.get_support(indices=True)]
-
-
-modelList=[
-        lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=400,subsample_freq=2,max_depth=8,random_state=666,n_estimators=350,learning_rate=0.02,verbose=1),
-        xgb.XGBRegressor(subsample=0.8,colsample_bytree=0.9,colsample_bylevel=0.9,max_depth=5,seed=666,learning_rate=0.02,n_estimators=300),        
-        ];
-higherModel=Ridge(random_state=888,alpha=0);
-stackerModel=stacker(modelList,higherModel,obj='reg',kFold=KFold(n_splits=5,random_state=555),kFoldHigher=KFold(n_splits=5,random_state=444));
-
-stackerModel.fit(dataTrainX,dataTrainY);
-
-for model in stackerModel.modelHigherList:
-    print(model.coef_)
+#estimator = lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=400,subsample_freq=2,max_depth=8,random_state=666,n_estimators=350,learning_rate=0.02,verbose=1);
+#selector = RFECV(estimator, step=20, cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer,verbose=True);
+#selector = selector.fit(dataTrainX,dataTrainY);
+#print(len(selector.grid_scores_));
+#print(selector.grid_scores_);
+#print(selector.get_support(indices=True))
+#print(selector.n_features_)
 #
-ans=stackerModel.predict(dataPre[dataTrainX.columns]);
-
-
-ans=pd.DataFrame({'uid':t_vis['uid'],'loan_amount':ans});
-ans.loc[ans['loan_amount']<0,['loan_amount']]=0;
-ans.to_csv('D:/general_file_unclassified/about_code/JDD/Loan_pre/data/submit.csv',columns=['uid','loan_amount'],index=False);
-print('end');
+#
+#temp=selector.grid_scores_;
+#for i in temp:
+#    print(i);
+#
+#
+#
+#dataTrainX=dataTrainX.iloc[:,selector.get_support(indices=True)]
+#
+#
+#modelList=[
+#        lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=400,subsample_freq=2,max_depth=8,random_state=666,n_estimators=350,learning_rate=0.02,verbose=1),
+#        xgb.XGBRegressor(subsample=0.8,colsample_bytree=0.9,colsample_bylevel=0.9,max_depth=5,seed=666,learning_rate=0.02,n_estimators=300),        
+#        ];
+#higherModel=Ridge(random_state=888,alpha=0);
+#stackerModel=stacker(modelList,higherModel,obj='reg',kFold=KFold(n_splits=5,random_state=555),kFoldHigher=KFold(n_splits=5,random_state=444));
+#
+#stackerModel.fit(dataTrainX,dataTrainY);
+#
+#for model in stackerModel.modelHigherList:
+#    print(model.coef_)
+##
+#ans=stackerModel.predict(dataPre[dataTrainX.columns]);
+#
+#
+#ans=pd.DataFrame({'uid':t_vis['uid'],'loan_amount':ans});
+#ans.loc[ans['loan_amount']<0,['loan_amount']]=0;
+#ans.to_csv('D:/general_file_unclassified/about_code/JDD/Loan_pre/data/submit.csv',columns=['uid','loan_amount'],index=False);
+#print('end');
 
 
