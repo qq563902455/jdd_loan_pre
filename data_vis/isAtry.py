@@ -127,7 +127,35 @@ print('-'*30);
 print('t_loan和t_loan_sum中没有空值');
 print(t_loan.count())
 print(t_loan_sum.count())
+t_loan.index=pd.to_datetime(t_loan['loan_time']);
+t_loan['dayofweek']=t_loan.index.dayofweek;
+t_loan['day']=t_loan.index.day;
+t_loan['hour']=t_loan['loan_time'].apply(lambda x:x[11:13]).astype(int);
+
+t_loan['hour_cat']=0;
+t_loan.loc[t_loan['hour']>=7,'hour_cat']+=1;
+t_loan.loc[t_loan['hour']>=16,'hour_cat']+=1;
+
+
+t_loan['day_cat']=0;
+t_loan.loc[t_loan['day']>10,'day_cat']+=1;
+t_loan.loc[t_loan['day']>20,'day_cat']+=1;
+
+
+t_loan['dayofweek_cat']=0;
+t_loan.loc[t_loan['dayofweek']==0,'dayofweek_cat']=1;
+t_loan.loc[t_loan['dayofweek']==6,'dayofweek_cat']=1;
+
+
+
+num1=len(t_loan['hour_cat'].unique());
+num2=len(t_loan['day_cat'].unique());
+num3=len(t_loan['dayofweek_cat'].unique());
+
+t_loan['hour_day_week_cat']=t_loan['hour_cat']*num3*num2+t_loan['day_cat']*num3+t_loan['dayofweek_cat']
+
 t_loan['month']=t_loan['loan_time'].apply(lambda x:x[5:7]).astype(int);
+
 tempGroupby=t_loan.groupby(by=['uid','month'],as_index=False);
 t_user_loan=tempGroupby['loan_amount'].sum();
 t_user_loan['plannum_amount']=tempGroupby['plannum'].sum()['plannum'];
@@ -135,9 +163,41 @@ t_user_loan['loan_average']=tempGroupby['loan_amount'].mean()['loan_amount'];
 t_user_loan['plannum_average']=tempGroupby['plannum'].mean()['plannum'];
 t_user_loan['burden_per_m']=t_user_loan['loan_amount']/t_user_loan['plannum_amount'];
 t_user_loan['loan_num']=tempGroupby['loan_time'].count()['loan_time'];
-t_user_loan['loan_max']=tempGroupby['loan_amount'].max()['loan_amount'];
-t_user_loan['loan_min']=tempGroupby['loan_amount'].min()['loan_amount'];
-t_user_loan.head(20)
+
+for cat in ['hour_cat','dayofweek_cat','day_cat','hour_day_week_cat']:
+      tempGroupby=t_loan.groupby(by=['uid','month',cat],as_index=False);
+      t_temp=tempGroupby['loan_amount'].sum()
+      t_temp['plannum_amount']=tempGroupby['plannum'].sum()['plannum'];
+      t_temp['loan_average']=tempGroupby['loan_amount'].mean()['loan_amount'];
+      t_temp['plannum_average']=tempGroupby['plannum'].mean()['plannum'];
+      t_temp['burden_per_m']=t_user_loan['loan_amount']/t_user_loan['plannum_amount'];
+      t_temp['loan_num']=tempGroupby['loan_time'].count()['loan_time'];
+      rawNameList=t_temp.columns;
+      for i in t_temp[cat].unique():
+            t_temp.columns=rawNameList;
+            for col in t_temp:
+                  if col not in ['uid','month',cat]:
+                        t_temp=t_temp.rename(columns={col:cat+str(i)+'_'+col});
+            t_user_loan=pd.merge(t_user_loan,t_temp[t_temp[cat]==i].drop([cat],axis=1),how='left',on=['uid','month']);
+      t_user_loan=t_user_loan.fillna(0);
+
+
+for cat in ['hour_cat','dayofweek_cat','day_cat','hour_day_week_cat','hour_day_week_cat']:
+      ratioColList=[];
+      for i in t_loan[cat].unique():
+            t_user_loan[cat+str(i)+'_loan_ratio']=t_user_loan[cat+str(i)+'_loan_amount']/t_user_loan['loan_amount'];
+            t_user_loan['is_'+cat+str(i)+'_loan_max']=0;
+            ratioColList.append(cat+str(i)+'_loan_ratio');
+      t_user_loan[cat+'_loan_ratio_max']=t_user_loan[ratioColList].max(axis=1);
+      
+      for i in t_loan[cat].unique():
+            t_user_loan.loc[t_user_loan[cat+'_loan_ratio_max']==t_user_loan[cat+str(i)+'_loan_ratio'],'is_'+cat+str(i)+'_loan_max']=1;
+
+
+print('t_user_loan完成'); 
+
+
+
 
 
 print('-'*30);
@@ -204,9 +264,23 @@ print('-'*30);
 
 
 print('开始合并数据集，开始做一些统计分析:')
-print('根据观察t_loan_sum里的数据,就是t_user_loan里面11月的数据');
 
-print('合并t_user与t_user_loan');
+
+for col in t_user.columns:
+    if col not in ['uid','month','age','sex','limit']:        
+        t_user=t_user.rename(columns={col:'t_user_'+col});
+for col in t_user_loan.columns:
+    if col not in ['uid','month','age','sex','limit']: 
+        t_user_loan=t_user_loan.rename(columns={col:'t_loan_'+col});
+for col in t_order_user.columns:
+    if col not in ['uid','month','age','sex','limit']: 
+        t_order_user=t_order_user.rename(columns={col:'t_order_'+col});   
+for col in t_user_click.columns:
+    if col not in ['uid','month','age','sex','limit']: 
+        t_user_click=t_user_click.rename(columns={col:'t_click_'+col});   
+
+
+
 tempList=[];
 for i in range(8,12):
     temp=t_user.copy();
@@ -215,8 +289,12 @@ for i in range(8,12):
     
 t_merge=pd.concat(tempList);
 
+
+ 
+
+
 t_merge=pd.merge(left=t_merge,right=t_user_loan,on=['uid','month'],how='left');
-t_merge[['plannum_amount','plannum_average']]=t_merge[['plannum_amount','plannum_average']].fillna(1);
+#t_merge[['plannum_amount','plannum_average']]=t_merge[['plannum_amount','plannum_average']].fillna(1);
 t_merge=t_merge.fillna(0);
 t_merge=pd.merge(left=t_merge,right=t_order_user,on=['uid','month'],how='left');
 t_merge=t_merge.fillna(0);

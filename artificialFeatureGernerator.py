@@ -13,8 +13,7 @@ import math;
 from sklearn.metrics import mean_squared_error;
 from sklearn.model_selection import KFold; 
 
-
-class artificialFeatureGernerator:
+class featureGernerator:
     def __init__(self,model,dataX,dataY,kFold=KFold(n_splits=5,random_state=0),verbose=False):
         self.model=model;
         self.dataX=dataX;
@@ -33,11 +32,9 @@ class artificialFeatureGernerator:
             for col in kTrain_y.columns:
                 self.model.fit(kTrain_x,kTrain_y[col]);
                 colPre=self.model.predict(kTest_x);
-                self.verbosePrint(self,col+' rmse: ',math.sqrt(mean_squared_error(kTest_y, colPre)))
-                artificialFeatures.iloc[kTestIndex,col]=colPre;            
+                if self.verbose==True:
+                    print(col+' rmse: ',math.sqrt(mean_squared_error(kTest_y[col], colPre)));
+                artificialFeatures[col].iloc[kTestIndex]=colPre;            
         return artificialFeatures;
             
         
-    def verbosePrint(self,out):
-        if self.verbose==True:
-            print(out);
