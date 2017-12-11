@@ -241,25 +241,25 @@ temp=lgbReg.cv_results_;
 
 
 #gridsearch调参
-#rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
-#lgbReg=xgb.XGBRegressor();
-#paramGrid={  
-#        'subsample':[0.8],
-#        'colsample_bylevel':[0.9],
-#        'colsample_bytree':[0.9],
-#        'max_depth':[5],
-#        'seed':[666],
-#        'learning_rate':[0.02],
-#        'n_estimators':[300],
-#        'min_child_weight':[5]
-#};
-#
-#lgbReg=GridSearchCV(lgbReg,paramGrid,cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer);
-#lgbReg.fit(dataTrainX,dataTrainY);
-#print(lgbReg.best_score_);
-#print(lgbReg.best_params_);
-#print(lgbReg.cv_results_);
-#temp=lgbReg.cv_results_
+rmseScorer=make_scorer(rmseScoreCal,greater_is_better=False);
+lgbReg=xgb.XGBRegressor();
+paramGrid={  
+        'subsample':[0.8],
+        'colsample_bylevel':[0.9],
+        'colsample_bytree':[0.9],
+        'max_depth':[4],
+        'seed':[666],
+        'learning_rate':[0.1],
+        'n_estimators':[60],
+        'min_child_weight':[5]
+};
+
+lgbReg=GridSearchCV(lgbReg,paramGrid,cv=KFold(n_splits=5,random_state=1),scoring=rmseScorer);
+lgbReg.fit(dataTrainX,dataTrainY);
+print(lgbReg.best_score_);
+print(lgbReg.best_params_);
+print(lgbReg.cv_results_);
+temp=lgbReg.cv_results_
 
 def selfEvalMetric(y_true, y_pred):
     return ('rmse',rmseScoreCal(y_true, y_pred),False);
@@ -301,33 +301,34 @@ print(selector.get_support(indices=True))
 print(selector.n_features_)
 #
 #
-#temp=selector.grid_scores_;
-#for i in temp:
-#    print(i);
-##
-##
-##
-#dataTrainX=dataTrainX.iloc[:,selector.get_support(indices=True)]
+temp=selector.grid_scores_;
+for i in temp:
+    print(i);
 #
 #
-#modelList=[
-#        lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=400,subsample_freq=2,max_depth=8,random_state=666,n_estimators=350,learning_rate=0.02,verbose=1),
-#        xgb.XGBRegressor(subsample=0.8,colsample_bytree=0.9,colsample_bylevel=0.9,max_depth=5,seed=666,learning_rate=0.02,n_estimators=300),        
-#        ];
-#higherModel=Ridge(random_state=888,alpha=0);
-#stackerModel=stacker(modelList,higherModel,obj='reg',kFold=KFold(n_splits=5,random_state=555),kFoldHigher=KFold(n_splits=5,random_state=444));
 #
-#stackerModel.fit(dataTrainX,dataTrainY);
+dataTrainX=dataTrainX.iloc[:,selector.get_support(indices=True)]
+
+
+modelList=[
+        lgb.LGBMRegressor(subsample=0.9,colsample_bytree=0.8,subsample_for_bin=220000,min_child_samples=400,subsample_freq=2,max_depth=8,random_state=666,n_estimators=350,reg_alpha=1.0,reg_lambda=0.7,learning_rate=0.02,verbose=1),
+        xgb.XGBRegressor(subsample=0.8,colsample_bytree=0.9,colsample_bylevel=0.9,max_depth=4,seed=666,learning_rate=0.02,n_estimators=300),
+        Ridge(random_state=333),
+        ];
+higherModel=Ridge(random_state=888,alpha=0);
+stackerModel=stacker(modelList,higherModel,obj='reg',kFold=KFold(n_splits=5,random_state=555),kFoldHigher=KFold(n_splits=5,random_state=444));
+
+stackerModel.fit(dataTrainX,dataTrainY);
+
+for model in stackerModel.modelHigherList:
+    print(model.coef_)
 #
-#for model in stackerModel.modelHigherList:
-#    print(model.coef_)
-##
-#ans=stackerModel.predict(dataPre[dataTrainX.columns]);
-#
-#
-#ans=pd.DataFrame({'uid':t_vis['uid'],'loan_amount':ans});
-#ans.loc[ans['loan_amount']<0,['loan_amount']]=0;
-#ans.to_csv('D:/general_file_unclassified/about_code/JDD/Loan_pre/data/submit.csv',columns=['uid','loan_amount'],index=False);
-#print('end');
+ans=stackerModel.predict(dataPre[dataTrainX.columns]);
+
+
+ans=pd.DataFrame({'uid':t_vis['uid'],'loan_amount':ans});
+ans.loc[ans['loan_amount']<0,['loan_amount']]=0;
+ans.to_csv('D:/general_file_unclassified/about_code/JDD/Loan_pre/data/submit.csv',columns=['uid','loan_amount'],index=False);
+print('end');
 
 
